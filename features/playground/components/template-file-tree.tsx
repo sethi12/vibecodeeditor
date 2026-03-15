@@ -97,7 +97,7 @@ interface TemplateFileTreeProps {
     parentPath: string,
   ) => void;
 }
-const TemplateFileTree = ({
+export const TemplateFileTree = ({
   data,
   onFileSelect,
   SelectedFile,
