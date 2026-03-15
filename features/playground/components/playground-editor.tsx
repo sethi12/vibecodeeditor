@@ -429,9 +429,9 @@ export const PlaygroundEditor = ({
         }
 
         // Trigger suggestion with a delay
-        suggestionTimeoutRef.current = setTimeout(() => {
-          onTriggerSuggestion("completion", editor)
-        }, 300)
+        // suggestionTimeoutRef.current = setTimeout(() => {
+        //   onTriggerSuggestion("completion", editor)
+        // }, 300)
       }
     })
 
