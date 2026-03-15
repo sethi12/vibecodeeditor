@@ -361,6 +361,7 @@ const handleRenameSubmit = (newFilename:string,newExtension:string)=>{
       <SidebarMenuItem>
         <div className="group relative flex items-center">
           <SidebarMenuButton
+          isActive={isSelected}
             className={cn(
               "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
               "hover:bg-accent/70 active:bg-accent",
