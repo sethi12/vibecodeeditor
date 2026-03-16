@@ -127,46 +127,94 @@ Generate suggestion:`
 /**
  * Generate suggestion using AI service
  */
+// async function generateSuggestion(prompt: string): Promise<string> {
+//   try {
+//     // Replace this with your actual AI service call
+//     const response = await fetch("http://localhost:11434/api/generate", {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({
+//         model: "codellama:7b",
+//         prompt,
+//         stream: false,
+//         options: {
+//           temperature: 0.7,
+//           max_tokens: 300,
+//         },
+//       }),
+//     })
+
+//     if (!response.ok) {
+//       throw new Error(`AI service error: ${response.statusText}`)
+//     }
+
+//     const data = await response.json()
+//     let suggestion = data.response
+
+//     // Clean up the suggestion
+//     if (suggestion.includes("```")) {
+//       const codeMatch = suggestion.match(/```[\w]*\n?([\s\S]*?)```/)
+//       suggestion = codeMatch ? codeMatch[1].trim() : suggestion
+//     }
+
+//     // Remove cursor markers if present
+//     suggestion = suggestion.replace(/\|CURSOR\|/g, "").trim()
+
+//     return suggestion
+//   } catch (error) {
+//     console.error("AI generation error:", error)
+//     return "// AI suggestion unavailable"
+//   }
+// }
+/**
+ * 
+ * Generate suggestion using Groq API (OpenAI-compatible)
+ */
 async function generateSuggestion(prompt: string): Promise<string> {
   try {
-    // Replace this with your actual AI service call
-    const response = await fetch("http://localhost:11434/api/generate", {
+const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=" + process.env.GEMINI_API_KEY, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
-        model: "codellama:7b",
-        prompt,
-        stream: false,
-        options: {
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ],
+        generationConfig: {
           temperature: 0.7,
-          max_tokens: 300,
+          maxOutputTokens: 300,
+          topP: 0.9,
         },
       }),
-    })
+    });
 
     if (!response.ok) {
-      throw new Error(`AI service error: ${response.statusText}`)
+      const err = await response.text();
+      throw new Error(`Gemini API error: ${response.status} - ${err}`);
     }
 
-    const data = await response.json()
-    let suggestion = data.response
+    const data = await response.json();
+    let suggestion = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
-    // Clean up the suggestion
+    // Clean up (same as before)
     if (suggestion.includes("```")) {
-      const codeMatch = suggestion.match(/```[\w]*\n?([\s\S]*?)```/)
-      suggestion = codeMatch ? codeMatch[1].trim() : suggestion
+      const codeMatch = suggestion.match(/```[\w]*\n?([\s\S]*?)```/);
+      suggestion = codeMatch ? codeMatch[1].trim() : suggestion;
     }
 
-    // Remove cursor markers if present
-    suggestion = suggestion.replace(/\|CURSOR\|/g, "").trim()
+    suggestion = suggestion.replace(/\|CURSOR\|/g, "").trim();
 
-    return suggestion
+    return suggestion || "// No suggestion available";
   } catch (error) {
-    console.error("AI generation error:", error)
-    return "// AI suggestion unavailable"
+    console.error("Gemini error:", error);
+    return "// AI suggestion unavailable";
   }
 }
-
 // Helper functions for code analysis
 function detectLanguage(content: string, fileName?: string): string {
   if (fileName) {
