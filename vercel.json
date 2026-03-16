@@ -1,0 +1,12 @@
+{
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next",
+      "config": {
+        "nextVersion": "16",
+        "bundler": "webpack"
+      }
+    }
+  ]
+}
