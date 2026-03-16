@@ -18,80 +18,84 @@ import { NextConfig } from "next";
 // };
 
 // export default nextConfig;
-/** @type {import('next').NextConfig} */
-const nextConfig: NextConfig = {
-  // Enable React Compiler (stable in Next.js 15+)
+/** /** @type {import('next').NextConfig} */
+const nextConfig = {
+  // React Compiler – stable and recommended
   reactCompiler: true,
 
-  // Allow remote images from any HTTPS domain (you already had this)
+  // Remote images – your config is correct, but we can make it cleaner
   images: {
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "**",           // allows any domain
-        port: "",
-        pathname: "/**",
+        protocol: 'https',
+        hostname: '**',
       },
-      {
-        protocol: "http",
-        hostname: "**",           // optional: allow http too (less secure)
-        port: "",
-        pathname: "/**",
-      },
+      // http is rarely needed and less secure – only add if you really use it
+      // {
+      //   protocol: 'http',
+      //   hostname: '**',
+      // },
     ],
   },
 
-  // Required for WebContainer to work (fixes SharedArrayBuffer error)
+  // Required for WebContainer (SharedArrayBuffer) – this is correct
   async headers() {
     return [
       {
-        // Apply to all routes
-        source: "/:path*",
+        source: '/:path*',
         headers: [
           {
-            key: "Cross-Origin-Opener-Policy",
-            value: "same-origin",
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
           },
           {
-            key: "Cross-Origin-Embedder-Policy",
-            value: "require-corp",
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'require-corp',
           },
         ],
       },
     ];
   },
 
-  // Optional but recommended additions
-
-  // Better webpack compatibility (sometimes needed with WebContainer or heavy deps)
+  // Webpack fallback – only needed in client bundles (browser)
   webpack: (config: { resolve: { fallback: any; }; }, { isServer }: any) => {
-    // Fix for WebContainer + some node polyfills
     if (!isServer) {
+      // Prevents "Can't resolve 'fs'" etc. in client code
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
         path: false,
         os: false,
+        crypto: false,     // often needed with Prisma/WebContainer
+        stream: false,
       };
     }
     return config;
   },
 
-  // Enable experimental features (optional – good defaults for 2026)
+  // Recommended experimental features (stable in 16.x)
   experimental: {
-    // Better server actions & streaming
     serverActions: {
-      bodySizeLimit: "2mb",
+      bodySizeLimit: '2mb', // good default for larger payloads
     },
-    // Turbopack in dev (you can remove if you prefer --no-turbo)
-    // turbopack: true,
+    // If you want to force-disable Turbopack everywhere (recommended for stability)
+    // turbopack: false,
   },
 
-  // Optional: compress assets more aggressively
+  // Production optimizations
   compress: true,
+  swcMinify: true,         // yes – this IS valid and recommended
+  productionBrowserSourceMaps: false, // reduces bundle size
 
-  // Optional: improve production build speed
-  // swcMinify: true, // Removed because it's not a valid NextConfig property
+  // Optional: if you use TypeScript aggressively
+  typescript: {
+    ignoreBuildErrors: false, // keep strict in production
+  },
+
+  // Optional: if you use ESLint
+  eslint: {
+    ignoreDuringBuilds: false,
+  },
 };
 
 export default nextConfig;
