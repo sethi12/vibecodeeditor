@@ -22,7 +22,7 @@ import { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Enable React Compiler (stable in Next.js 15+)
   reactCompiler: true,
-
+turbopack:{},
   // Allow remote images from any HTTPS domain (you already had this)
   images: {
     remotePatterns: [
