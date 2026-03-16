@@ -120,7 +120,28 @@ export const TemplateFileTree = ({
      const handleAddRootFolder = ()=>{
       setisNewFolderDialogOpen(true)
     }
+const handleCreateFile =(filename:string,extension:string)=>{
+  if(onAddFile && isRootFolder){
+    const newfile : TemplateFile={
+      filename,
+      fileExtension:extension,
+      content:""
+    }
+    onAddFile(newfile,"")
+  }
+  setisNewFileDialogOpen(false)
+}
 
+const handleCreateFolder = (folderName:string)=>{
+  if(onAddFolder && isRootFolder){
+    const newFolder:TemplateFolder={
+      folderName,
+      items:[],
+    }
+    onAddFolder(newFolder,"")
+  }
+  setisNewFolderDialogOpen(false)
+}
   return (
     <Sidebar>
         <SidebarContent>
@@ -188,13 +209,13 @@ export const TemplateFileTree = ({
 <NewFileDialog
 isOpen={isNewFileDialogOpen}
 onClose={()=>setisNewFileDialogOpen(false)}
-onCreateFile={()=>{}}
+onCreateFile={handleCreateFile}
 
 />
 <NewFolderDialog
   isOpen={isNewFolderDialogOpen}
   onClose={()=>setisNewFolderDialogOpen(false)}
-  onCreateFolder={()=>{}}
+  onCreateFolder={handleCreateFolder}
 />
             </SidebarGroup>
         </SidebarContent>
