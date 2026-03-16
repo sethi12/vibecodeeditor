@@ -408,6 +408,32 @@ const handleRenameSubmit = (newFilename:string,newExtension:string)=>{
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        <RenameFileDialog
+          isOpen={isRenameDialogOpen}
+          onClose={()=>setisRenameDialogOpen(false)}
+          onRenameFile={handleRenameSubmit}
+          currentFileName={file.filename}
+          currentExtension={file.fileExtension}
+        />
+      <AlertDialog open={isDeletedDialogOpen} onOpenChange={setisDeletedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete File</AlertDialogTitle>
+            <AlertDescription>
+              Are yor sure you want to delete "${fileName}"? this action cannot be undo
+            </AlertDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} 
+            className="bg-destructive text-destructive-foregroud hover:bg-destructive/90">
+                  Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+
+      </AlertDialog>
+      
       </SidebarMenuItem>
     );
   }
@@ -446,7 +472,7 @@ const handleRenameSubmit = (newFilename:string,newExtension:string)=>{
       setisNewFileDialogOpen(false)
     }
 
-    const handlecreatefolder = (foldername:string)=>{
+    const handlecreatefolder = (folderName:string)=>{
       if(onAddFolder){
         const newFolder:TemplateFolder={
             folderName,

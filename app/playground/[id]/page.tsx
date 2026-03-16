@@ -39,12 +39,16 @@ import {
 } from "@/components/ui/resizable";
 import { Sidebar } from "lucide-react";
 import { useParams } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { TemplateFile } from "@/lib/generated/prisma/client";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { TemplateFile } from "@/features/playground/types";
 import { PlaygroundEditor } from "@/features/playground/components/playground-editor";
 import { useWebContainer } from "@/features/webcontainers/hooks/useWebContainer";
 import WebContainerPreview from "@/features/webcontainers/components/webcontainer-preview";
 import LoadingStep from "@/components/ui/laoder";
+import { findFilePath } from "@/features/playground/lib";
+import { TemplateFolder } from "@/features/playground/types";
+import ToggleAi from "@/features/playground/components/toggle-ai";
+import { useAISuggestions } from "@/features/ai/hooks/UseAiSuggestions";
 
 
 const Page = () => {
@@ -73,12 +77,87 @@ const Page = () => {
   useEffect(()=>{
     setPlaygroundId(id)
   },[id,setPlaygroundId])
+
+
+  const aisuggestion = useAISuggestions();
+
+
+
+    const lastSyncedContent = useRef<Map<string,string>>(new Map())
+  const {
+    serverUrl,
+    isLoading:containerLoading,
+    error:containerError,
+    instance,
+    writeFileSync
+    //@ts-ignore
+  } = useWebContainer({templateData})
   
   useEffect(()=>{
     if(templateData && !openFiles.length){
       setTemplateData(templateData)
     }
   },[templateData,setTemplateData,openFiles.length])
+const wrappedhandleaddFile = useCallback((newFile:TemplateFile,parentPath:string)=>{
+          return handleAddFile(
+            
+            newFile,
+            parentPath,
+            writeFileSync!,
+            instance,
+            savetemplatedata
+          )
+},[handleAddFile,writeFileSync,instance,savetemplatedata])
+  const wrappedHandleAddFolder = useCallback(
+    (newFolder: TemplateFolder, parentPath: string) => {
+      return handleAddFolder(newFolder, parentPath, instance, savetemplatedata);
+    },
+    [handleAddFolder, instance, savetemplatedata]
+  );
+
+  const wrappedHandleDeleteFile = useCallback(
+    (file: TemplateFile, parentPath: string) => {
+      return handleDeleteFile(file, parentPath, savetemplatedata);
+    },
+    [handleDeleteFile, savetemplatedata]
+  );
+
+  const wrappedHandleDeleteFolder = useCallback(
+    (folder: TemplateFolder, parentPath: string) => {
+      return handleDeleteFolder(folder, parentPath, savetemplatedata);
+    },
+    [handleDeleteFolder, savetemplatedata]
+  );
+
+  const wrappedHandleRenameFile = useCallback(
+    (
+      file: TemplateFile,
+      newFilename: string,
+      newExtension: string,
+      parentPath: string
+    ) => {
+      return handleRenameFile(
+        file,
+        newFilename,
+        newExtension,
+        parentPath,
+        savetemplatedata
+      );
+    },
+    [handleRenameFile, savetemplatedata]
+  );
+
+  const wrappedHandleRenameFolder = useCallback(
+    (folder: TemplateFolder, newFolderName: string, parentPath: string) => {
+      return handleRenameFolder(
+        folder,
+        newFolderName,
+        parentPath,
+        savetemplatedata
+      );
+    },
+    [handleRenameFolder, savetemplatedata]
+  );
   const activeFile = openFiles.find((file) => file.id === activeFileId);
   const hasunsavedchanges = openFiles.some((file) => file.hasUnsavedChanges);
   const [isPreviewVisible, setIsPreviewVisible] = useState(true);
@@ -88,16 +167,96 @@ const Page = () => {
     openFile(file);
     
   };
-  
-  const {
-    serverUrl,
-    isLoading:containerLoading,
-    error:containerError,
-    instance,
-    writeFileSync
-    //@ts-ignore
-  } = useWebContainer({templateData})
 
+const handleSave= useCallback(
+    async(fileId?:string)=>{
+      const targetFileId = fileId || activeFileId
+      if(!targetFileId) return;
+
+      const fileToSave = openFiles.find((f)=>f.id === targetFileId);
+      if(!fileToSave)return;
+      const latestTemplateData = useFileExplorer.getState().templateData;
+
+      if(!latestTemplateData)return;
+          try {
+              const filepath = findFilePath(fileToSave,latestTemplateData);
+                if(!filepath){
+                  toast.error(`could not find path for file 
+                    ${fileToSave.filename}.${fileToSave.fileExtension}`);
+                  return;
+                }
+                const UpdatedTemplatedata = JSON.parse(JSON.stringify(latestTemplateData))
+                const updateFileContent = (items: any[]) =>
+          items.map((item) => {
+            if ("folderName" in item) {
+              return { ...item, items: updateFileContent(item.items) };
+            } else if (
+              item.filename === fileToSave.filename &&
+              item.fileExtension === fileToSave.fileExtension
+            ) {
+              return { ...item, content: fileToSave.content };
+            }
+            return item;
+          });
+        UpdatedTemplatedata.items = updateFileContent(
+          UpdatedTemplatedata.items
+        );
+          if(writeFileSync){
+            await writeFileSync(filepath,fileToSave.content)
+            lastSyncedContent.current.set(fileToSave.id,fileToSave.content)
+            if(instance && instance.fs){
+              await instance.fs.writeFile(filepath,fileToSave.content)
+            }
+          }
+          const newTemplateData = await savetemplatedata(UpdatedTemplatedata)
+          setTemplateData(newTemplateData || UpdatedTemplatedata)
+          const updatedOpenFiles =  openFiles.map((f)=>
+            f.id === targetFileId ? {
+              ...f,
+              content:fileToSave.content,
+              hasunsavedchanges:false
+            }:f
+          );
+          setOpenFiles(updatedOpenFiles)
+          toast.success(`Saved ${fileToSave.filename}.${fileToSave.fileExtension}`)
+        
+          } catch (error) {
+              console.error(error)
+              toast.error(`Failed to Save ${fileToSave.filename}.${fileToSave.fileExtension}`)
+          }
+    
+  },[
+    activeFile,openFiles,
+    writeFileSync,instance,savetemplatedata,setTemplateData,
+    setOpenFiles
+  ])
+
+  const handleSaveAll = async()=>{
+    const unsavedfiles = openFiles.filter((f)=>f.hasUnsavedChanges);
+    if(unsavedfiles.length === 0 ){
+      toast.info("No Unsave Changes")
+      return;
+    }
+
+    try {
+        await Promise.all(unsavedfiles.map((f)=>handleSave(f.id)))
+        toast.success(`Saved ${unsavedfiles.length} file(s)`)
+    } catch (error) {
+        toast.error(`failed to save some files `)
+        console.error(error)
+    }
+  }
+
+  React.useEffect(()=>{
+    const handleKeyDown = (e:KeyboardEvent)=>{
+      if(e.ctrlKey && e.key ==="s"){
+        e.preventDefault()
+        handleSave()
+      }
+    };
+    window.addEventListener("keydown",handleKeyDown);
+    return()=>window.removeEventListener("keydown",handleKeyDown)
+  },[handleSave])
   if(error){
     return(
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)] p-4">
@@ -134,17 +293,25 @@ const Page = () => {
       </div>
     );
   }
-
+  
   console.log(openFiles)
   console.log(templateData);
   console.log("PlaygroundData", playgroundData);
   return (
     <TooltipProvider>
       <>
-        <TemplateFileTree data={templateData!} title="File Explorer"
+        <TemplateFileTree data={templateData!} title="File Explorer" 
         //@ts-ignore
           onFileSelect={handleFileSelect}
-        SelectedFile={activeFile} />
+        SelectedFile={activeFile} 
+        onAddFile={wrappedhandleaddFile}
+        onAddFolder={wrappedHandleAddFolder}
+        onDeleteFile={wrappedHandleDeleteFile}
+        onDeleteFolder={wrappedHandleDeleteFolder}
+        onRenameFile={wrappedHandleRenameFile}
+        onRenameFolder={wrappedHandleRenameFolder}
+
+        />
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
@@ -164,7 +331,7 @@ const Page = () => {
                     <Button
                       size={"sm"}
                       variant={"outline"}
-                      onClick={() => {}}
+                      onClick={()=>handleSave()}
                       disabled={!activeFile || !activeFile.hasUnsavedChanges}
                     >
                       <Save className="size-4" />
@@ -177,7 +344,7 @@ const Page = () => {
                     <Button
                       size={"sm"}
                       variant={"outline"}
-                      onClick={() => {}}
+                      onClick={handleSaveAll}
                       disabled={!activeFile || !activeFile.hasUnsavedChanges}
                     >
                       <Save className="size-4" /> All
@@ -188,19 +355,11 @@ const Page = () => {
                 {
                   //TODO : Toggle Ai
                 }
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size={"sm"}
-                      variant={"outline"}
-                      onClick={() => {}}
-                      disabled={!activeFile || !activeFile.hasUnsavedChanges}
-                    >
-                      <Bot className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Toggle Ai</TooltipContent>
-                </Tooltip>
+            <ToggleAi
+            isEnabled={aisuggestion.isEnabled}
+            onToggle={aisuggestion.toggleEnabled}
+            suggestionLoading={aisuggestion.isLoading}
+            />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="sm" variant="outline">
@@ -284,18 +443,18 @@ const Page = () => {
                         onContentChange={(value) =>
                           activeFileId && updateFileContent(activeFileId, value)
                         }
-                        // suggestion={aiSuggestions.suggestion}
-                        // suggestionLoading={aiSuggestions.isLoading}
-                        // suggestionPosition={aiSuggestions.position}
-                        // onAcceptSuggestion={(editor, monaco) =>
-                        //   aiSuggestions.acceptSuggestion(editor, monaco)
-                        // }
-                        // onRejectSuggestion={(editor) =>
-                        //   aiSuggestions.rejectSuggestion(editor)
-                        // }
-                        // onTriggerSuggestion={(type, editor) =>
-                        //   aiSuggestions.fetchSuggestion(type, editor)
-                        // }
+                        suggestion={aisuggestion.suggestion}
+                        suggestionLoading={aisuggestion.isLoading}
+                        suggestionPosition={aisuggestion.position}
+                        onAcceptSuggestion={(editor, monaco) =>
+                          aisuggestion.acceptSuggestion(editor, monaco)
+                        }
+                        onRejectSuggestion={(editor) =>
+                          aisuggestion.rejectSuggestion(editor)
+                        }
+                        onTriggerSuggestion={(type, editor) =>
+                          aisuggestion.fetchSuggestion(type, editor)
+                        }
                               />
                               </ResizablePanel>
 
