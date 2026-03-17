@@ -185,22 +185,38 @@ const handleSave= useCallback(
                     ${fileToSave.filename}.${fileToSave.fileExtension}`);
                   return;
                 }
-                const UpdatedTemplatedata = JSON.parse(JSON.stringify(latestTemplateData))
-                const updateFileContent = (items: any[]) =>
-          items.map((item) => {
-            if ("folderName" in item) {
-              return { ...item, items: updateFileContent(item.items) };
-            } else if (
-              item.filename === fileToSave.filename &&
-              item.fileExtension === fileToSave.fileExtension
-            ) {
-              return { ...item, content: fileToSave.content };
-            }
-            return item;
-          });
-        UpdatedTemplatedata.items = updateFileContent(
-          UpdatedTemplatedata.items
-        );
+        //         const UpdatedTemplatedata = JSON.parse(JSON.stringify(latestTemplateData))  
+        //         const updateFileContent = (items: any[]) =>
+        //   items.map((item) => {
+        //     if ("folderName" in item) {
+        //       return { ...item, items: updateFileContent(item.items) };
+        //     } else if (
+        //       item.filename === fileToSave.filename &&
+        //       item.fileExtension === fileToSave.fileExtension
+        //     ) {
+        //       return { ...item, content: fileToSave.content };
+        //     }
+        //     return item;
+        //   });
+        // UpdatedTemplatedata.items = updateFileContent(
+        //   UpdatedTemplatedata.items
+        // );
+        const UpdatedTemplatedata = JSON.parse(JSON.stringify(latestTemplateData))
+
+const updateFileContent = (items: any[]): any[] =>   // ← add return type : any[]
+  items.map((item) => {
+    if ("folderName" in item) {
+      return { ...item, items: updateFileContent(item.items) };
+    } else if (
+      item.filename === fileToSave.filename &&
+      item.fileExtension === fileToSave.fileExtension
+    ) {
+      return { ...item, content: fileToSave.content };
+    }
+    return item;
+  });
+
+UpdatedTemplatedata.items = updateFileContent(UpdatedTemplatedata.items);
           if(writeFileSync){
             await writeFileSync(filepath,fileToSave.content)
             lastSyncedContent.current.set(fileToSave.id,fileToSave.content)
@@ -209,7 +225,7 @@ const handleSave= useCallback(
             }
           }
           const newTemplateData = await savetemplatedata(UpdatedTemplatedata)
-          setTemplateData(newTemplateData || UpdatedTemplatedata)
+          setTemplateData(newTemplateData! || UpdatedTemplatedata)
           const updatedOpenFiles =  openFiles.map((f)=>
             f.id === targetFileId ? {
               ...f,
